@@ -11,7 +11,7 @@ import {
   doc,
   updateDoc,
 } from "firebase/firestore";
-import { ref, uploadBytes } from "firebase/storage";
+import { ref, uploadBytes, listAll, getDownloadURL } from "firebase/storage";
 
 function App() {
   const [movieList, setMovieList] = useState([]);
@@ -23,6 +23,7 @@ function App() {
   const [updateTitle, setUpdateTitle] = useState("");
 
   const [fileUpload, setFileUpload] = useState(null);
+  const [imageList, setImageList] = useState([]);
 
   const moviesCollection = collection(db, "movies");
 
@@ -75,16 +76,35 @@ function App() {
     }
   };
 
+  const imageListref = ref(storage, "projectFiles");
+
   const uploadFileHandler = async () => {
-    if (!fileUpload) return;
+    if (fileUpload == null) return;
     const filesFolderRef = ref(storage, `projectFiles/${fileUpload.name}`);
     try {
       await uploadBytes(filesFolderRef, fileUpload);
-      console.log("File Uploaded Succesfully");
+      getDownloadURL(filesFolderRef).then((url) => {
+        setImageList((prev) => [...prev, url]);
+      });
     } catch (error) {
       console.log(error);
     }
   };
+
+  useEffect(() => {
+    const fetchImageList = async () => {
+      try {
+        const response = await listAll(imageListref);
+        const downloadURLs = await Promise.all(
+          response.items.map((item) => getDownloadURL(item))
+        );
+        setImageList(downloadURLs);
+      } catch (error) {
+        console.log(error);
+      }
+    };
+    fetchImageList();
+  }, []);
   return (
     <>
       <div className="flex justify-center items-center flex-col pb-[1rem]">
@@ -163,6 +183,9 @@ function App() {
         >
           Upload File
         </button>
+        {imageList.map((url, index) => {
+          return <img key={index} className="w-[10rem]" src={url} />;
+        })}
       </div>
     </>
   );
